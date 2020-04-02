@@ -33,6 +33,39 @@ final class RepositoryActionTests: XCTestCase {
 
         XCTAssertEqual(fetchRepositories.events, [.next(true), .completed])
     }
+
+    func testBookmarkRepository() {
+        let testTarget = dependency.testTarget
+        let userDefaults = dependency.userDefaults
+        let repositoryDispatcher = dependency.repositoryDispatcher
+        let repositoryStore = dependency.repositoryStore
+
+        let mockRepository1 = Repository.mock(id: 1)
+        let mockRepository2 = Repository.mock(id: 2)
+
+        let mockRepositories = [mockRepository1, mockRepository2]
+
+        let updateBookmarks = WatchStack(repositoryDispatcher.updateBookmarks)
+
+        // 初期状態
+        XCTAssertEqual(updateBookmarks.events, [])
+        XCTAssertThrowsError(try userDefaults.get(key: .bookmarks, of: [Repository].self))
+
+        repositoryStore._bookmarks.accept([mockRepository1])
+
+        // お気に入り登録後
+        testTarget.bookmarkRepository(repository: mockRepository2)
+
+        XCTAssertEqual(updateBookmarks.events, [.next(mockRepositories)])
+        XCTAssertNoThrow(try userDefaults.get(key: .bookmarks, of: [Repository].self))
+
+        // すでに登録されているものをお気に入り登録
+        repositoryStore._bookmarks.accept([mockRepository1, mockRepository2])
+        testTarget.bookmarkRepository(repository: mockRepository2)
+
+        XCTAssertEqual(updateBookmarks.events, [.next(mockRepositories)])
+        XCTAssertNoThrow(try userDefaults.get(key: .bookmarks, of: [Repository].self))
+    }
 }
 
 extension RepositoryActionTests {
@@ -40,13 +73,20 @@ extension RepositoryActionTests {
         let testTarget: RepositoryAction
 
         let apiClient: MockAPIClient
+        let userDefaults: MockUserDefaults
+        let repositoryDispatcher: RepositoryDispatcher
         let repositoryStore: MockRepositoryStore
 
         init() {
             apiClient = MockAPIClient()
+            userDefaults = MockUserDefaults()
+            repositoryDispatcher = RepositoryDispatcher()
             repositoryStore = MockRepositoryStore()
 
-            testTarget = RepositoryAction(apiClient: apiClient)
+            testTarget = RepositoryAction(apiClient: apiClient,
+                                          userDefaults: userDefaults,
+                                          dispatcher: repositoryDispatcher,
+                                          store: repositoryStore)
         }
     }
 }

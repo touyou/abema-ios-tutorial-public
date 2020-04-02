@@ -48,6 +48,24 @@ final class RepositoryListViewController: UIViewController {
                 self?.presentFetchErrorAlert()
             })
             .disposed(by: disposeBag)
+
+        tableView.rx.itemSelected
+            .bind(to: viewStream.input.accept(for: \.didSelectCell))
+            .disposed(by: disposeBag)
+
+        viewStream.output.presentBookmarkAlert
+            .observeOn(ConcurrentMainScheduler.instance)
+            .subscribe(onNext: { [weak self] (indexPath, repository) in
+                self?.presentBookmarkAlert(indexPath: indexPath, repository: repository)
+            })
+            .disposed(by: disposeBag)
+
+        viewStream.output.presentAlreadyBookmarkedAlert
+            .observeOn(ConcurrentMainScheduler.instance)
+            .subscribe(onNext: { [weak self] in
+                self?.presentAlreadyBookmarkedAlert(indexPath: $0)
+            })
+            .disposed(by: disposeBag)
     }
 
     required init?(coder aDecoder: NSCoder) {
@@ -84,6 +102,39 @@ final class RepositoryListViewController: UIViewController {
         }
 
         alertController.addAction(closeAction)
+        present(alertController, animated: true)
+    }
+
+    private func presentBookmarkAlert(indexPath: IndexPath, repository: Repository) {
+        let alertController = UIAlertController(title: repository.name,
+                                                message: L10n.bookmarkAlertMessage,
+                                                preferredStyle: .alert)
+
+        let closeAction = UIAlertAction(title: L10n.close, style: .cancel) { [weak self] _ in
+            self?.tableView.deselectRow(at: indexPath, animated: true)
+            self?.viewStream.input.accept((), for: \.fetchErrorAlertDismissed)
+        }
+        alertController.addAction(closeAction)
+
+        let bookmarkAction = UIAlertAction(title: L10n.bookmark, style: .default) { [weak self] _ in
+            self?.tableView.deselectRow(at: indexPath, animated: true)
+            self?.viewStream.input.accept(repository, for: \.didBookmarkRepository)
+        }
+        alertController.addAction(bookmarkAction)
+
+        present(alertController, animated: true)
+    }
+
+    private func presentAlreadyBookmarkedAlert(indexPath: IndexPath) {
+        let alertController = UIAlertController(title: L10n.alreadyBookmarkedAlertTitle,
+                                                message: L10n.alreadyBookmarkedAlertMessage,
+                                                preferredStyle: .alert)
+
+        let closeAction = UIAlertAction(title: L10n.close, style: .cancel) { [weak self] _ in
+            self?.tableView.deselectRow(at: indexPath, animated: true)
+        }
+        alertController.addAction(closeAction)
+
         present(alertController, animated: true)
     }
 }

@@ -9,4 +9,10 @@ final class MockRepositoryAction: RepositoryActionType {
     func fetchRepositories(limit: Int, offset: Int) -> Observable<Void> {
         return _fetchResult.dematerialize()
     }
+
+    private(set) var _bookmarkResult: Repository?
+
+    func bookmarkRepository(repository: Repository) {
+        _bookmarkResult = repository
+    }
 }

@@ -22,6 +22,8 @@ extension RepositoryListViewStream {
         let viewWillAppear = PublishRelay<Void>()
         let refreshControlValueChanged = PublishRelay<Void>()
         let fetchErrorAlertDismissed = PublishRelay<Void>()
+        let didSelectCell = PublishRelay<IndexPath>()
+        let didBookmarkRepository = PublishRelay<Repository>()
     }
 
     struct Output: OutputType {
@@ -29,10 +31,13 @@ extension RepositoryListViewStream {
         let reloadData: PublishRelay<Void>
         let isRefreshControlRefreshing: BehaviorRelay<Bool>
         let presentFetchErrorAlert: PublishRelay<Void>
+        let presentBookmarkAlert: PublishRelay<(IndexPath, Repository)>
+        let presentAlreadyBookmarkedAlert: PublishRelay<IndexPath>
     }
 
     struct State: StateType {
         let repositories = BehaviorRelay<[Repository]>(value: [])
+        let bookmarks = BehaviorRelay<[Repository]>(value: [])
         let isRefreshControlRefreshing = BehaviorRelay<Bool>(value: false)
     }
 
@@ -54,6 +59,8 @@ extension RepositoryListViewStream {
         let viewWillAppear = dependency.inputObservables.viewWillAppear
         let refreshControlValueChanged = dependency.inputObservables.refreshControlValueChanged
         let fetchErrorAlertDismissed = dependency.inputObservables.fetchErrorAlertDismissed
+        let didSelectCell = dependency.inputObservables.didSelectCell
+        let didBookmarkRepository = dependency.inputObservables.didBookmarkRepository
 
         let fetchRepositories = Observable
             .merge(viewWillAppear,
@@ -67,6 +74,10 @@ extension RepositoryListViewStream {
 
         flux.repositoryStore.repositories.asObservable()
             .bind(to: state.repositories)
+            .disposed(by: disposeBag)
+
+        flux.repositoryStore.bookmarks.asObservable()
+            .bind(to: state.bookmarks)
             .disposed(by: disposeBag)
 
         fetchRepositoriesAction.executing
@@ -87,10 +98,35 @@ extension RepositoryListViewStream {
             .bind(to: reloadData)
             .disposed(by: disposeBag)
 
+        let presentBookmarkAlert = PublishRelay<(IndexPath, Repository)>()
+        let presentAlreadyBookmarkedAlert = PublishRelay<IndexPath>()
+
+        didSelectCell
+            .subscribe(onNext: { indexPath in
+                guard let repository = state.repositories.value[safe: indexPath.row] else {
+                    return
+                }
+
+                if state.bookmarks.value.contains(repository) {
+                    presentAlreadyBookmarkedAlert.accept(indexPath)
+                } else {
+                    presentBookmarkAlert.accept((indexPath, repository))
+                }
+            })
+            .disposed(by: disposeBag)
+
+        didBookmarkRepository
+            .subscribe(onNext: {
+                flux.repositoryAction.bookmarkRepository(repository: $0)
+            })
+            .disposed(by: disposeBag)
+
         return Output(repositories: state.repositories,
                       reloadData: reloadData,
                       isRefreshControlRefreshing: state.isRefreshControlRefreshing,
-                      presentFetchErrorAlert: presentFetchErrorAlert)
+                      presentFetchErrorAlert: presentFetchErrorAlert,
+                      presentBookmarkAlert: presentBookmarkAlert,
+                      presentAlreadyBookmarkedAlert: presentAlreadyBookmarkedAlert)
     }
 }
 

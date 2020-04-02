@@ -166,6 +166,65 @@ final class RepositoryListViewStreamTests: XCTestCase {
         XCTAssertEqual(isRefreshControlRefreshing.value, false)
         XCTAssertEqual(presentFetchErrorAlert.events, [.next(true)])
     }
+
+    func testDidSelectCell() {
+        let testTarget = dependency.testTarget
+        let repositoryStore = dependency.repositoryStore
+
+        let repositories = WatchStack(testTarget.output.repositories)
+        let presentBookmarkAlert = WatchStack(testTarget.output.presentBookmarkAlert)
+        let presentAlreadyBookmarkedAlert = WatchStack(testTarget.output.presentAlreadyBookmarkedAlert)
+
+        // 初期状態
+
+        XCTAssertEqual(repositories.value, [])
+        XCTAssertTrue(presentBookmarkAlert.events.isEmpty)
+        XCTAssertTrue(presentAlreadyBookmarkedAlert.events.isEmpty)
+
+        // セルの選択後
+
+        let repository = Repository.mock()
+        repositoryStore._repositories.accept([repository])
+
+        let indexPath = IndexPath(row: 0, section: 0)
+        testTarget.input.accept(indexPath, for: \.didSelectCell)
+
+        XCTAssertEqual(repositories.value, [repository])
+        XCTAssertEqual(presentBookmarkAlert.value?.0, indexPath)
+        XCTAssertEqual(presentBookmarkAlert.value?.1, repository)
+        XCTAssertEqual(presentBookmarkAlert.events.count, 1)
+        XCTAssertTrue(presentAlreadyBookmarkedAlert.events.isEmpty)
+
+        // お気に入り登録済みのセルの選択後
+
+        repositoryStore._bookmarks.accept([repository])
+
+        testTarget.input.accept(indexPath, for: \.didSelectCell)
+
+        XCTAssertEqual(repositories.value, [repository])
+        XCTAssertEqual(presentBookmarkAlert.value?.0, indexPath)
+        XCTAssertEqual(presentBookmarkAlert.value?.1, repository)
+        XCTAssertEqual(presentBookmarkAlert.events.count, 1)
+        XCTAssertEqual(presentAlreadyBookmarkedAlert.value, indexPath)
+        XCTAssertEqual(presentAlreadyBookmarkedAlert.events.count, 1)
+    }
+
+    func testDidBookmarkRepository() {
+        let testTarget = dependency.testTarget
+        let repositoryAction = dependency.repositoryAction
+
+        // 初期状態
+
+        XCTAssertNil(repositoryAction._bookmarkResult)
+
+        // お気に入り登録後
+
+        let repository = Repository.mock()
+
+        testTarget.input.accept(repository, for: \.didBookmarkRepository)
+
+        XCTAssertEqual(repositoryAction._bookmarkResult, repository)
+    }
 }
 
 extension RepositoryListViewStreamTests {
