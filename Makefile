@@ -24,7 +24,7 @@ carthage/update:
 
 .PHONY: cocoapods/bootstrap
 cocoapods/bootstrap: gem-install xcodegen
-	bundle exec pod install
+	pod install
 
 # Tools
 
